@@ -48,6 +48,7 @@ end_ind = -1;
 aus_det = [];
 aus_det_id = [];
 
+%%
 while ischar(data)
     if(~isempty(findstr(data, 'au occurences:')))
         num_occurences = str2num(data(numel('au occurences:')+1:end));
@@ -100,6 +101,7 @@ end
 f = fopen('results/Bosphorus_res_class.txt', 'w');
 labels_gt_bin = labels_gt;
 labels_gt_bin(labels_gt_bin > 1) = 1;
+f1s_class = zeros(1, numel(aus_Bosph));
 for au = 1:numel(aus_Bosph)
   
     tp = sum(labels_gt_bin(:,au) == 1 & labels_pred(:, au) == 1);
@@ -111,6 +113,7 @@ for au = 1:numel(aus_Bosph)
     recall = tp./(tp+fn);
 
     f1 = 2 * precision .* recall ./ (precision + recall);
+    f1s_class(au) = f1;
 
     fprintf(f, 'AU%d class, Precision - %.3f, Recall - %.3f, F1 - %.3f\n', aus_Bosph(au), precision, recall, f1);
 
@@ -180,9 +183,12 @@ end
 
 %%
 f = fopen('results/Bosphorus_res_int.txt', 'w');
+cccs_reg = zeros(1, numel(aus_Bosph));
 for au = 1:numel(aus_Bosph)
   
     [ ~, ~, corrs, ccc, rms, ~ ] = evaluate_regression_results( labels_pred(:, au), labels_gt(:, au));
+    
+    cccs_reg(au) = ccc;
     
     fprintf(f, 'AU%d intensity, Corr - %.3f, RMS - %.3f, CCC - %.3f\n', aus_Bosph(au), corrs, rms, ccc);
 

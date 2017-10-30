@@ -1,37 +1,13 @@
 ///////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2016, Carnegie Mellon University and University of Cambridge,
+// Copyright (C) 2017, Carnegie Mellon University and University of Cambridge,
 // all rights reserved.
 //
-// THIS SOFTWARE IS PROVIDED “AS IS” FOR ACADEMIC USE ONLY AND ANY EXPRESS
-// OR IMPLIED WARRANTIES WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
-// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY.
-// OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-// ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
+// ACADEMIC OR NON-PROFIT ORGANIZATION NONCOMMERCIAL RESEARCH USE ONLY
 //
-// Notwithstanding the license granted herein, Licensee acknowledges that certain components
-// of the Software may be covered by so-called “open source” software licenses (“Open Source
-// Components”), which means any software licenses approved as open source licenses by the
-// Open Source Initiative or any substantially similar licenses, including without limitation any
-// license that, as a condition of distribution of the software licensed under such license,
-// requires that the distributor make the software available in source code format. Licensor shall
-// provide a list of Open Source Components for a particular version of the Software upon
-// Licensee’s request. Licensee will comply with the applicable terms of such licenses and to
-// the extent required by the licenses covering Open Source Components, the terms of such
-// licenses will apply in lieu of the terms of this Agreement. To the extent the terms of the
-// licenses applicable to Open Source Components prohibit any of the restrictions in this
-// License Agreement with respect to such Open Source Component, such restrictions will not
-// apply to such Open Source Component. To the extent the terms of the licenses applicable to
-// Open Source Components require Licensor to make an offer to provide source code or
-// related information in connection with the Software, such offer is hereby made. Any request
-// for source code or related information should be directed to cl-face-tracker-distribution@lists.cam.ac.uk
-// Licensee acknowledges receipt of notices for the Open Source Components for the initial
-// delivery of the Software.
+// BY USING OR DOWNLOADING THE SOFTWARE, YOU ARE AGREEING TO THE TERMS OF THIS LICENSE AGREEMENT.  
+// IF YOU DO NOT AGREE WITH THESE TERMS, YOU MAY NOT USE OR DOWNLOAD THE SOFTWARE.
+//
+// License can be found in OpenFace-license.txt
 
 //     * Any publications arising from the use of this software, including but
 //       not limited to academic journal and conference publications, technical
@@ -131,7 +107,7 @@ int main (int argc, char **argv)
 	vector<string> arguments = get_arguments(argc, argv);
 
 	// Some initial parameters that can be overriden from command line	
-	vector<string> files, depth_directories, tracked_videos_output, dummy_out;
+	vector<string> files, tracked_videos_output, dummy_out;
 	
 	// By default try webcam 0
 	int device = 0;
@@ -150,9 +126,8 @@ int main (int argc, char **argv)
 	det_parameters.push_back(det_params);
 
 	// Get the input output file parameters
-	bool u;
 	string output_codec;
-	LandmarkDetector::get_video_input_output_params(files, depth_directories, dummy_out, tracked_videos_output, u, output_codec, arguments);
+	LandmarkDetector::get_video_input_output_params(files, dummy_out, tracked_videos_output, output_codec, arguments);
 	// Get camera parameters
 	LandmarkDetector::get_camera_params(device, fx, fy, cx, cy, arguments);
 	
@@ -200,8 +175,6 @@ int main (int argc, char **argv)
 			f_n++;			
 		    current_file = files[f_n];
 		}
-
-		bool use_depth = !depth_directories.empty();	
 
 		// Do some grabbing
 		cv::VideoCapture video_capture;
@@ -264,7 +237,6 @@ int main (int argc, char **argv)
 		{		
 
 			// Reading the images
-			cv::Mat_<float> depth_image;
 			cv::Mat_<uchar> grayscale_image;
 
 			cv::Mat disp_image = captured_image.clone();
@@ -278,28 +250,6 @@ int main (int argc, char **argv)
 				grayscale_image = captured_image.clone();				
 			}
 		
-			// Get depth image
-			if(use_depth)
-			{
-				char* dst = new char[100];
-				std::stringstream sstream;
-
-				sstream << depth_directories[f_n] << "\\depth%05d.png";
-				sprintf(dst, sstream.str().c_str(), frame_count + 1);
-				// Reading in 16-bit png image representing depth
-				cv::Mat_<short> depth_image_16_bit = cv::imread(string(dst), -1);
-
-				// Convert to a floating point depth image
-				if(!depth_image_16_bit.empty())
-				{
-					depth_image_16_bit.convertTo(depth_image, CV_32F);
-				}
-				else
-				{
-					WARN_STREAM( "Can't find depth image" );
-				}
-			}
-
 			vector<cv::Rect_<double> > face_detections;
 
 			bool all_models_active = true;
@@ -361,7 +311,7 @@ int main (int argc, char **argv)
 
 							// This ensures that a wider window is used for the initial landmark localisation
 							clnf_models[model].detection_success = false;
-							detection_success = LandmarkDetector::DetectLandmarksInVideo(grayscale_image, depth_image, face_detections[detection_ind], clnf_models[model], det_parameters[model]);
+							detection_success = LandmarkDetector::DetectLandmarksInVideo(grayscale_image, face_detections[detection_ind], clnf_models[model], det_parameters[model]);
 													
 							// This activates the model
 							active_models[model] = true;
@@ -375,7 +325,7 @@ int main (int argc, char **argv)
 				else
 				{
 					// The actual facial landmark detection / tracking
-					detection_success = LandmarkDetector::DetectLandmarksInVideo(grayscale_image, depth_image, clnf_models[model], det_parameters[model]);
+					detection_success = LandmarkDetector::DetectLandmarksInVideo(grayscale_image, clnf_models[model], det_parameters[model]);
 				}
 			});
 								
@@ -404,7 +354,7 @@ int main (int argc, char **argv)
 					int thickness = (int)std::ceil(2.0* ((double)captured_image.cols) / 640.0);
 					
 					// Work out the pose of the head from the tracked model
-					cv::Vec6d pose_estimate = LandmarkDetector::GetCorrectedPoseWorld(clnf_models[model], fx, fy, cx, cy);
+					cv::Vec6d pose_estimate = LandmarkDetector::GetPose(clnf_models[model], fx, fy, cx, cy);
 					
 					// Draw it in reddish if uncertain, blueish if certain
 					LandmarkDetector::DrawBox(disp_image, pose_estimate, cv::Scalar((1-detection_certainty)*255.0,0, detection_certainty*255), thickness, fx, fy, cx, cy);
@@ -446,12 +396,6 @@ int main (int argc, char **argv)
 			{
 				cv::namedWindow("tracking_result",1);
 				cv::imshow("tracking_result", disp_image);
-
-				if(!depth_image.empty())
-				{
-					// Division needed for visualisation purposes
-					imshow("depth", depth_image/2000.0);
-				}
 			}
 
 			// output the tracked video

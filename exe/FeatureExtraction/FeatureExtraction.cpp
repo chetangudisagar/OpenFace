@@ -1,37 +1,13 @@
 ///////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2016, Carnegie Mellon University and University of Cambridge,
+// Copyright (C) 2017, Carnegie Mellon University and University of Cambridge,
 // all rights reserved.
 //
-// THIS SOFTWARE IS PROVIDED “AS IS” FOR ACADEMIC USE ONLY AND ANY EXPRESS
-// OR IMPLIED WARRANTIES WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
-// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY.
-// OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-// ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
+// ACADEMIC OR NON-PROFIT ORGANIZATION NONCOMMERCIAL RESEARCH USE ONLY
 //
-// Notwithstanding the license granted herein, Licensee acknowledges that certain components
-// of the Software may be covered by so-called “open source” software licenses (“Open Source
-// Components”), which means any software licenses approved as open source licenses by the
-// Open Source Initiative or any substantially similar licenses, including without limitation any
-// license that, as a condition of distribution of the software licensed under such license,
-// requires that the distributor make the software available in source code format. Licensor shall
-// provide a list of Open Source Components for a particular version of the Software upon
-// Licensee’s request. Licensee will comply with the applicable terms of such licenses and to
-// the extent required by the licenses covering Open Source Components, the terms of such
-// licenses will apply in lieu of the terms of this Agreement. To the extent the terms of the
-// licenses applicable to Open Source Components prohibit any of the restrictions in this
-// License Agreement with respect to such Open Source Component, such restrictions will not
-// apply to such Open Source Component. To the extent the terms of the licenses applicable to
-// Open Source Components require Licensor to make an offer to provide source code or
-// related information in connection with the Software, such offer is hereby made. Any request
-// for source code or related information should be directed to cl-face-tracker-distribution@lists.cam.ac.uk
-// Licensee acknowledges receipt of notices for the Open Source Components for the initial
-// delivery of the Software.
+// BY USING OR DOWNLOADING THE SOFTWARE, YOU ARE AGREEING TO THE TERMS OF THIS LICENSE AGREEMENT.  
+// IF YOU DO NOT AGREE WITH THESE TERMS, YOU MAY NOT USE OR DOWNLOAD THE SOFTWARE.
+//
+// License can be found in OpenFace-license.txt
 
 //     * Any publications arising from the use of this software, including but
 //       not limited to academic journal and conference publications, technical
@@ -155,9 +131,9 @@ void create_directory(string output_path)
 	}
 }
 
-void get_output_feature_params(vector<string> &output_similarity_aligned, vector<string> &output_hog_aligned_files, double &similarity_scale,
-	int &similarity_size, bool &grayscale, bool& verbose, bool& dynamic, bool &output_2D_landmarks, bool &output_3D_landmarks,
-	bool &output_model_params, bool &output_pose, bool &output_AUs, bool &output_gaze, vector<string> &arguments);
+void get_output_feature_params(vector<string> &output_similarity_aligned, vector<string> &output_hog_aligned_files, bool& visualize_track,
+	bool& visualize_align, bool& visualize_hog, bool &output_2D_landmarks, bool &output_3D_landmarks, bool &output_model_params,
+	bool &output_pose, bool &output_AUs, bool &output_gaze, vector<string> &arguments);
 
 void get_image_input_output_params_feats(vector<vector<string> > &input_image_files, bool& as_video, vector<string> &arguments);
 
@@ -193,14 +169,14 @@ void visualise_tracking(cv::Mat& captured_image, const LandmarkDetector::CLNF& f
 		// A rough heuristic for box around the face width
 		int thickness = (int)std::ceil(2.0* ((double)captured_image.cols) / 640.0);
 
-		cv::Vec6d pose_estimate_to_draw = LandmarkDetector::GetCorrectedPoseWorld(face_model, fx, fy, cx, cy);
+		cv::Vec6d pose_estimate_to_draw = LandmarkDetector::GetPose(face_model, fx, fy, cx, cy);
 
 		// Draw it in reddish if uncertain, blueish if certain
 		LandmarkDetector::DrawBox(captured_image, pose_estimate_to_draw, cv::Scalar((1 - vis_certainty)*255.0, 0, vis_certainty * 255), thickness, fx, fy, cx, cy);
 
 		if (det_parameters.track_gaze && detection_success && face_model.eye_model)
 		{
-			FaceAnalysis::DrawGaze(captured_image, face_model, gazeDirection0, gazeDirection1, fx, fy, cx, cy);
+			GazeAnalysis::DrawGaze(captured_image, face_model, gazeDirection0, gazeDirection1, fx, fy, cx, cy);
 		}
 	}
 
@@ -228,43 +204,29 @@ void visualise_tracking(cv::Mat& captured_image, const LandmarkDetector::CLNF& f
 
 void prepareOutputFile(std::ofstream* output_file, bool output_2D_landmarks, bool output_3D_landmarks,
 	bool output_model_params, bool output_pose, bool output_AUs, bool output_gaze,
-	int num_landmarks, int num_model_modes, vector<string> au_names_class, vector<string> au_names_reg);
+	int num_face_landmarks, int num_model_modes, int num_eye_landmarks, vector<string> au_names_class, vector<string> au_names_reg);
 
 // Output all of the information into one file in one go (quite a few parameters, but simplifies the flow)
 void outputAllFeatures(std::ofstream* output_file, bool output_2D_landmarks, bool output_3D_landmarks,
 	bool output_model_params, bool output_pose, bool output_AUs, bool output_gaze,
 	const LandmarkDetector::CLNF& face_model, int frame_count, double time_stamp, bool detection_success,
-	cv::Point3f gazeDirection0, cv::Point3f gazeDirection1, const cv::Vec6d& pose_estimate, double fx, double fy, double cx, double cy,
+	cv::Point3f gazeDirection0, cv::Point3f gazeDirection1, cv::Vec2d gaze_angle, cv::Vec6d& pose_estimate, double fx, double fy, double cx, double cy,
 	const FaceAnalysis::FaceAnalyser& face_analyser);
-
-void post_process_output_file(FaceAnalysis::FaceAnalyser& face_analyser, string output_file, bool dynamic);
-
 
 int main (int argc, char **argv)
 {
 
 	vector<string> arguments = get_arguments(argc, argv);
-
-	// Search paths
-	boost::filesystem::path config_path = boost::filesystem::path(CONFIG_DIR);
-	boost::filesystem::path parent_path = boost::filesystem::path(arguments[0]).parent_path();
-
-	// Some initial parameters that can be overriden from command line	
-	vector<string> input_files, depth_directories, output_files, tracked_videos_output;
 	
-	LandmarkDetector::FaceModelParameters det_parameters(arguments);
-	// Always track gaze in feature extraction
-	det_parameters.track_gaze = true;
-
+	// Some initial parameters that can be overriden from command line	
+	vector<string> input_files, output_files, tracked_videos_output;
+	
 	// Get the input output file parameters
 	
-	// Indicates that rotation should be with respect to camera or world coordinates
-	bool use_world_coordinates;
 	string output_codec; //not used but should
-	LandmarkDetector::get_video_input_output_params(input_files, depth_directories, output_files, tracked_videos_output, use_world_coordinates, output_codec, arguments);
+	LandmarkDetector::get_video_input_output_params(input_files, output_files, tracked_videos_output, output_codec, arguments);
 
 	bool video_input = true;
-	bool verbose = true;
 	bool images_as_video = false;
 
 	vector<vector<string> > input_image_files;
@@ -302,19 +264,8 @@ int main (int argc, char **argv)
 		fx_undefined = true;
 	}
 
-	// The modules that are being used for tracking
-	LandmarkDetector::CLNF face_model(det_parameters.model_location);	
-
 	vector<string> output_similarity_align;
 	vector<string> output_hog_align_files;
-
-	double sim_scale = -1;
-	int sim_size = 112;
-	bool grayscale = false;
-	bool video_output = false;
-	bool dynamic = true; // Indicates if a dynamic AU model should be used (dynamic is useful if the video is long enough to include neutral expressions)
-	int num_hog_rows;
-	int num_hog_cols;
 
 	// By default output all parameters, but these can be turned off to get smaller files or slightly faster processing times
 	// use -no2Dfp, -no3Dfp, -noMparams, -noPose, -noAUs, -noGaze to turn them off
@@ -325,77 +276,28 @@ int main (int argc, char **argv)
 	bool output_AUs = true;
 	bool output_gaze = true;
 
-	get_output_feature_params(output_similarity_align, output_hog_align_files, sim_scale, sim_size, grayscale, verbose, dynamic,
+	bool visualize_track = false;
+	bool visualize_align = false;
+	bool visualize_hog = false;
+	get_output_feature_params(output_similarity_align, output_hog_align_files, visualize_track, visualize_align, visualize_hog,
 		output_2D_landmarks, output_3D_landmarks, output_model_params, output_pose, output_AUs, output_gaze, arguments);
-
-	// Used for image masking
-	string tri_loc;
-	boost::filesystem::path tri_loc_path = boost::filesystem::path("model/tris_68_full.txt");
-	if (boost::filesystem::exists(tri_loc_path))
-	{
-		tri_loc = tri_loc_path.string();
-	}
-	else if (boost::filesystem::exists(parent_path/tri_loc_path))
-	{
-		tri_loc = (parent_path/tri_loc_path).string();
-	}
-	else if (boost::filesystem::exists(config_path/tri_loc_path))
-	{
-		tri_loc = (config_path/tri_loc_path).string();
-	}
-	else
-	{
-		cout << "Can't find triangulation files, exiting" << endl;
-		return 1;
-	}
-
-	// Will warp to scaled mean shape
-	cv::Mat_<double> similarity_normalised_shape = face_model.pdm.mean_shape * sim_scale;
-	// Discard the z component
-	similarity_normalised_shape = similarity_normalised_shape(cv::Rect(0, 0, 1, 2*similarity_normalised_shape.rows/3)).clone();
 
 	// If multiple video files are tracked, use this to indicate if we are done
 	bool done = false;	
 	int f_n = -1;
 	int curr_img = -1;
 
-	string au_loc;
+	// Load the modules that are being used for tracking and face analysis
+	// Load face landmark detector
+	LandmarkDetector::FaceModelParameters det_parameters(arguments);
+	// Always track gaze in feature extraction
+	det_parameters.track_gaze = true;
+	LandmarkDetector::CLNF face_model(det_parameters.model_location);
 
-	string au_loc_local;
-	if (dynamic)
-	{
-		au_loc_local = "AU_predictors/AU_all_best.txt";
-	}
-	else
-	{
-		au_loc_local = "AU_predictors/AU_all_static.txt";
-	}
+	// Load facial feature extractor and AU analyser
+	FaceAnalysis::FaceAnalyserParameters face_analysis_params(arguments);
+	FaceAnalysis::FaceAnalyser face_analyser(face_analysis_params);
 
-	boost::filesystem::path au_loc_path = boost::filesystem::path(au_loc_local);
-	if (boost::filesystem::exists(au_loc_path))
-	{
-		au_loc = au_loc_path.string();
-	}
-	else if (boost::filesystem::exists(parent_path/au_loc_path))
-	{
-		au_loc = (parent_path/au_loc_path).string();
-	}
-	else if (boost::filesystem::exists(config_path/au_loc_path))
-	{
-		au_loc = (config_path/au_loc_path).string();
-	}
-	else
-	{
-		cout << "Can't find AU prediction files, exiting" << endl;
-		return 1;
-	}
-
-	// Creating a  face analyser that will be used for AU extraction
-	// Make sure sim_scale is proportional to sim_size if not set
-	if (sim_scale == -1) sim_scale = sim_size * (0.7 / 112.0);
-
-	FaceAnalysis::FaceAnalyser face_analyser(vector<cv::Vec3d>(), sim_scale, sim_size, sim_size, au_loc, tri_loc);
-		
 	while(!done) // this is not a for loop as we might also be reading from a webcam
 	{
 		
@@ -458,6 +360,7 @@ int main (int argc, char **argv)
 			{
 				string curr_img_file = input_image_files[f_n][curr_img];
 				captured_image = cv::imread(curr_img_file, -1);
+				total_frames = input_image_files[f_n].size();
 			}
 			else
 			{
@@ -465,6 +368,8 @@ int main (int argc, char **argv)
 				return 1;
 			}
 
+			// If image sequence provided, assume the fps is 30
+			fps_vid_in = 30;
 		}	
 		
 		// If optical centers are not defined just use center of image
@@ -489,7 +394,9 @@ int main (int argc, char **argv)
 		if (!output_files.empty())
 		{
 			output_file.open(output_files[f_n], ios_base::out);
-			prepareOutputFile(&output_file, output_2D_landmarks, output_3D_landmarks, output_model_params, output_pose, output_AUs, output_gaze, face_model.pdm.NumberOfPoints(), face_model.pdm.NumberOfModes(), face_analyser.GetAUClassNames(), face_analyser.GetAURegNames());
+			int num_eye_landmarks = LandmarkDetector::CalculateAllEyeLandmarks(face_model).size();
+		
+			prepareOutputFile(&output_file, output_2D_landmarks, output_3D_landmarks, output_model_params, output_pose, output_AUs, output_gaze, face_model.pdm.NumberOfPoints(), face_model.pdm.NumberOfModes(), num_eye_landmarks, face_analyser.GetAUClassNames(), face_analyser.GetAURegNames());
 		}
 
 		// Saving the HOG features
@@ -525,8 +432,6 @@ int main (int argc, char **argv)
 				
 		// Use for timestamping if using a webcam
 		int64 t_initial = cv::getTickCount();
-
-		bool visualise_hog = verbose;
 
 		// Timestamp in seconds of current processing
 		double time_stamp = 0;
@@ -573,32 +478,35 @@ int main (int argc, char **argv)
 			// Gaze tracking, absolute gaze direction
 			cv::Point3f gazeDirection0(0, 0, -1);
 			cv::Point3f gazeDirection1(0, 0, -1);
+			cv::Vec2d gazeAngle(0, 0);
 
 			if (det_parameters.track_gaze && detection_success && face_model.eye_model)
 			{
-				FaceAnalysis::EstimateGaze(face_model, gazeDirection0, fx, fy, cx, cy, true);
-				FaceAnalysis::EstimateGaze(face_model, gazeDirection1, fx, fy, cx, cy, false);
+				GazeAnalysis::EstimateGaze(face_model, gazeDirection0, fx, fy, cx, cy, true);
+				GazeAnalysis::EstimateGaze(face_model, gazeDirection1, fx, fy, cx, cy, false);
+				gazeAngle = GazeAnalysis::GetGazeAngle(gazeDirection0, gazeDirection1);
 			}
 
 			// Do face alignment
 			cv::Mat sim_warped_img;
 			cv::Mat_<double> hog_descriptor;
+			int num_hog_rows, num_hog_cols;
 
 			// But only if needed in output
 			if(!output_similarity_align.empty() || hog_output_file.is_open() || output_AUs)
 			{
-				face_analyser.AddNextFrame(captured_image, face_model, time_stamp, false, !det_parameters.quiet_mode);
+				face_analyser.AddNextFrame(captured_image, face_model.detected_landmarks, face_model.detection_success, time_stamp, false, !det_parameters.quiet_mode && visualize_hog);
 				face_analyser.GetLatestAlignedFace(sim_warped_img);
 
-				if(!det_parameters.quiet_mode)
+				if(!det_parameters.quiet_mode && visualize_align)
 				{
 					cv::imshow("sim_warp", sim_warped_img);			
 				}
-				if(hog_output_file.is_open())
+				if(hog_output_file.is_open() || (visualize_hog && !det_parameters.quiet_mode))
 				{
 					face_analyser.GetLatestHOG(hog_descriptor, num_hog_rows, num_hog_cols);
 
-					if(visualise_hog && !det_parameters.quiet_mode)
+					if(visualize_hog && !det_parameters.quiet_mode)
 					{
 						cv::Mat_<double> hog_descriptor_vis;
 						FaceAnalysis::Visualise_FHOG(hog_descriptor, num_hog_rows, num_hog_cols, hog_descriptor_vis);
@@ -608,15 +516,7 @@ int main (int argc, char **argv)
 			}
 
 			// Work out the pose of the head from the tracked model
-			cv::Vec6d pose_estimate;
-			if(use_world_coordinates)
-			{
-				pose_estimate = LandmarkDetector::GetCorrectedPoseWorld(face_model, fx, fy, cx, cy);
-			}
-			else
-			{
-				pose_estimate = LandmarkDetector::GetCorrectedPoseCamera(face_model, fx, fy, cx, cy);
-			}
+			cv::Vec6d pose_estimate = LandmarkDetector::GetPose(face_model, fx, fy, cx, cy);
 
 			if (hog_output_file.is_open())
 			{
@@ -626,11 +526,6 @@ int main (int argc, char **argv)
 			// Write the similarity normalised output
 			if (!output_similarity_align.empty())
 			{
-
-				if (sim_warped_img.channels() == 3 && grayscale)
-				{
-					cvtColor(sim_warped_img, sim_warped_img, CV_BGR2GRAY);
-				}
 
 				char name[100];
 
@@ -653,11 +548,14 @@ int main (int argc, char **argv)
 			}
 
 			// Visualising the tracker
-			visualise_tracking(captured_image, face_model, det_parameters, gazeDirection0, gazeDirection1, frame_count, fx, fy, cx, cy);
+			if(visualize_track && !det_parameters.quiet_mode)
+			{
+				visualise_tracking(captured_image, face_model, det_parameters, gazeDirection0, gazeDirection1, frame_count, fx, fy, cx, cy);
+			}
 
 			// Output the landmarks, pose, gaze, parameters and AUs
 			outputAllFeatures(&output_file, output_2D_landmarks, output_3D_landmarks, output_model_params, output_pose, output_AUs, output_gaze,
-				face_model, frame_count, time_stamp, detection_success, gazeDirection0, gazeDirection1,
+				face_model, frame_count, time_stamp, detection_success, gazeDirection0, gazeDirection1, gazeAngle,
 				pose_estimate, fx, fy, cx, cy, face_analyser);
 
 			// output the tracked video
@@ -720,7 +618,7 @@ int main (int argc, char **argv)
 		if (output_files.size() > 0 && output_AUs)
 		{
 			cout << "Postprocessing the Action Unit predictions" << endl;
-			face_analyser.PostprocessOutputFile(output_files[f_n], dynamic);
+			face_analyser.PostprocessOutputFile(output_files[f_n]);
 		}
 		// Reset the models for the next video
 		face_analyser.Reset();
@@ -746,14 +644,23 @@ int main (int argc, char **argv)
 
 void prepareOutputFile(std::ofstream* output_file, bool output_2D_landmarks, bool output_3D_landmarks,
 	bool output_model_params, bool output_pose, bool output_AUs, bool output_gaze,
-	int num_landmarks, int num_model_modes, vector<string> au_names_class, vector<string> au_names_reg)
+	int num_face_landmarks, int num_model_modes, int num_eye_landmarks, vector<string> au_names_class, vector<string> au_names_reg)
 {
 
 	*output_file << "frame, timestamp, confidence, success";
 
 	if (output_gaze)
 	{
-		*output_file << ", gaze_0_x, gaze_0_y, gaze_0_z, gaze_1_x, gaze_1_y, gaze_1_z";
+		*output_file << ", gaze_0_x, gaze_0_y, gaze_0_z, gaze_1_x, gaze_1_y, gaze_1_z, gaze_angle_x, gaze_angle_y";
+
+		for (int i = 0; i < num_eye_landmarks; ++i)
+		{
+			*output_file << ", eye_lmk_x_" << i;
+		}
+		for (int i = 0; i < num_eye_landmarks; ++i)
+		{
+			*output_file << ", eye_lmk_y_" << i;
+		}
 	}
 
 	if (output_pose)
@@ -763,11 +670,11 @@ void prepareOutputFile(std::ofstream* output_file, bool output_2D_landmarks, boo
 
 	if (output_2D_landmarks)
 	{
-		for (int i = 0; i < num_landmarks; ++i)
+		for (int i = 0; i < num_face_landmarks; ++i)
 		{
 			*output_file << ", x_" << i;
 		}
-		for (int i = 0; i < num_landmarks; ++i)
+		for (int i = 0; i < num_face_landmarks; ++i)
 		{
 			*output_file << ", y_" << i;
 		}
@@ -775,15 +682,15 @@ void prepareOutputFile(std::ofstream* output_file, bool output_2D_landmarks, boo
 
 	if (output_3D_landmarks)
 	{
-		for (int i = 0; i < num_landmarks; ++i)
+		for (int i = 0; i < num_face_landmarks; ++i)
 		{
 			*output_file << ", X_" << i;
 		}
-		for (int i = 0; i < num_landmarks; ++i)
+		for (int i = 0; i < num_face_landmarks; ++i)
 		{
 			*output_file << ", Y_" << i;
 		}
-		for (int i = 0; i < num_landmarks; ++i)
+		for (int i = 0; i < num_face_landmarks; ++i)
 		{
 			*output_file << ", Z_" << i;
 		}
@@ -822,7 +729,7 @@ void prepareOutputFile(std::ofstream* output_file, bool output_2D_landmarks, boo
 void outputAllFeatures(std::ofstream* output_file, bool output_2D_landmarks, bool output_3D_landmarks,
 	bool output_model_params, bool output_pose, bool output_AUs, bool output_gaze,
 	const LandmarkDetector::CLNF& face_model, int frame_count, double time_stamp, bool detection_success,
-	cv::Point3f gazeDirection0, cv::Point3f gazeDirection1, const cv::Vec6d& pose_estimate, double fx, double fy, double cx, double cy,
+	cv::Point3f gazeDirection0, cv::Point3f gazeDirection1, cv::Vec2d gaze_angle, cv::Vec6d& pose_estimate, double fx, double fy, double cx, double cy,
 	const FaceAnalysis::FaceAnalyser& face_analyser)
 {
 
@@ -835,6 +742,21 @@ void outputAllFeatures(std::ofstream* output_file, bool output_2D_landmarks, boo
 	{
 		*output_file << ", " << gazeDirection0.x << ", " << gazeDirection0.y << ", " << gazeDirection0.z
 			<< ", " << gazeDirection1.x << ", " << gazeDirection1.y << ", " << gazeDirection1.z;
+
+		// Output gaze angle (same format as head pose angle)
+		*output_file << ", " << gaze_angle[0] << ", " << gaze_angle[1];
+
+		// Output eye landmarks
+		std::vector<cv::Point2d> eye_landmark_points = LandmarkDetector::CalculateAllEyeLandmarks(face_model);
+
+		for (size_t i = 0; i < eye_landmark_points.size(); ++i)
+		{
+			*output_file << ", " << eye_landmark_points[i].x;
+		}
+		for (size_t i = 0; i < eye_landmark_points.size(); ++i)
+		{
+			*output_file << ", " << eye_landmark_points[i].y;
+		}
 	}
 
 	// Output the estimated head pose
@@ -970,10 +892,9 @@ void outputAllFeatures(std::ofstream* output_file, bool output_2D_landmarks, boo
 }
 
 
-void get_output_feature_params(vector<string> &output_similarity_aligned, vector<string> &output_hog_aligned_files, double &similarity_scale,
-	int &similarity_size, bool &grayscale, bool& verbose, bool& dynamic,
-	bool &output_2D_landmarks, bool &output_3D_landmarks, bool &output_model_params, bool &output_pose, bool &output_AUs, bool &output_gaze,
-	vector<string> &arguments)
+void get_output_feature_params(vector<string> &output_similarity_aligned, vector<string> &output_hog_aligned_files, bool& visualize_track, 
+	bool& visualize_align, bool& visualize_hog, bool &output_2D_landmarks, bool &output_3D_landmarks, bool &output_model_params, 
+	bool &output_pose, bool &output_AUs, bool &output_gaze, vector<string> &arguments)
 {
 	output_similarity_aligned.clear();
 	output_hog_aligned_files.clear();
@@ -987,8 +908,9 @@ void get_output_feature_params(vector<string> &output_similarity_aligned, vector
 
 	string output_root = "";
 
-	// By default the model is dynamic
-	dynamic = true;
+	visualize_align = false;
+	visualize_hog = false;
+	visualize_track = false;
 
 	string separator = string(1, boost::filesystem::path::preferred_separator);
 
@@ -1027,30 +949,24 @@ void get_output_feature_params(vector<string> &output_similarity_aligned, vector
 		}
 		else if (arguments[i].compare("-verbose") == 0)
 		{
-			verbose = true;
+			visualize_track = true;
+			visualize_align = true;
+			visualize_hog = true;
 		}
-		else if (arguments[i].compare("-au_static") == 0)
+		else if (arguments[i].compare("-vis-align") == 0)
 		{
-			dynamic = false;
-		}
-		else if (arguments[i].compare("-g") == 0)
-		{
-			grayscale = true;
+			visualize_align = true;
 			valid[i] = false;
 		}
-		else if (arguments[i].compare("-simscale") == 0)
+		else if (arguments[i].compare("-vis-hog") == 0)
 		{
-			similarity_scale = stod(arguments[i + 1]);
+			visualize_hog = true;
 			valid[i] = false;
-			valid[i + 1] = false;
-			i++;
 		}
-		else if (arguments[i].compare("-simsize") == 0)
+		else if (arguments[i].compare("-vis-track") == 0)
 		{
-			similarity_size = stoi(arguments[i + 1]);
+			visualize_track = true;
 			valid[i] = false;
-			valid[i + 1] = false;
-			i++;
 		}
 		else if (arguments[i].compare("-no2Dfp") == 0)
 		{

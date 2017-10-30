@@ -1,57 +1,33 @@
 ///////////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2016, Carnegie Mellon University and University of Cambridge,
+// Copyright (C) 2017, Carnegie Mellon University and University of Cambridge,
 // all rights reserved.
 //
-// THIS SOFTWARE IS PROVIDED ìAS ISî FOR ACADEMIC USE ONLY AND ANY EXPRESS
-// OR IMPLIED WARRANTIES WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
-// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY.
-// OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-// ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
+// ACADEMIC OR NON-PROFIT ORGANIZATION NONCOMMERCIAL RESEARCH USE ONLY
 //
-// Notwithstanding the license granted herein, Licensee acknowledges that certain components
-// of the Software may be covered by so-called ìopen sourceî software licenses (ìOpen Source
-// Componentsî), which means any software licenses approved as open source licenses by the
-// Open Source Initiative or any substantially similar licenses, including without limitation any
-// license that, as a condition of distribution of the software licensed under such license,
-// requires that the distributor make the software available in source code format. Licensor shall
-// provide a list of Open Source Components for a particular version of the Software upon
-// Licenseeís request. Licensee will comply with the applicable terms of such licenses and to
-// the extent required by the licenses covering Open Source Components, the terms of such
-// licenses will apply in lieu of the terms of this Agreement. To the extent the terms of the
-// licenses applicable to Open Source Components prohibit any of the restrictions in this
-// License Agreement with respect to such Open Source Component, such restrictions will not
-// apply to such Open Source Component. To the extent the terms of the licenses applicable to
-// Open Source Components require Licensor to make an offer to provide source code or
-// related information in connection with the Software, such offer is hereby made. Any request
-// for source code or related information should be directed to cl-face-tracker-distribution@lists.cam.ac.uk
-// Licensee acknowledges receipt of notices for the Open Source Components for the initial
-// delivery of the Software.
-
+// BY USING OR DOWNLOADING THE SOFTWARE, YOU ARE AGREEING TO THE TERMS OF THIS LICENSE AGREEMENT.  
+// IF YOU DO NOT AGREE WITH THESE TERMS, YOU MAY NOT USE OR DOWNLOAD THE SOFTWARE.
+//
+// License can be found in OpenFace-license.txt
+//
 //     * Any publications arising from the use of this software, including but
 //       not limited to academic journal and conference publications, technical
 //       reports and manuals, must cite at least one of the following works:
 //
 //       OpenFace: an open source facial behavior analysis toolkit
-//       Tadas Baltruöaitis, Peter Robinson, and Louis-Philippe Morency
+//       Tadas Baltru≈°aitis, Peter Robinson, and Louis-Philippe Morency
 //       in IEEE Winter Conference on Applications of Computer Vision, 2016  
 //
 //       Rendering of Eyes for Eye-Shape Registration and Gaze Estimation
-//       Erroll Wood, Tadas Baltruöaitis, Xucong Zhang, Yusuke Sugano, Peter Robinson, and Andreas Bulling 
+//       Erroll Wood, Tadas Baltru≈°aitis, Xucong Zhang, Yusuke Sugano, Peter Robinson, and Andreas Bulling 
 //       in IEEE International. Conference on Computer Vision (ICCV),  2015 
 //
 //       Cross-dataset learning and person-speci?c normalisation for automatic Action Unit detection
-//       Tadas Baltruöaitis, Marwa Mahmoud, and Peter Robinson 
+//       Tadas Baltru≈°aitis, Marwa Mahmoud, and Peter Robinson 
 //       in Facial Expression Recognition and Analysis Challenge, 
 //       IEEE International Conference on Automatic Face and Gesture Recognition, 2015 
 //
 //       Constrained Local Neural Fields for robust facial landmark detection in the wild.
-//       Tadas Baltruöaitis, Peter Robinson, and Louis-Philippe Morency. 
+//       Tadas Baltru≈°aitis, Peter Robinson, and Louis-Philippe Morency. 
 //       in IEEE Int. Conference on Computer Vision Workshops, 300 Faces in-the-Wild Challenge, 2013.    
 //
 ///////////////////////////////////////////////////////////////////////////////
@@ -119,9 +95,9 @@ void create_directories(string output_path)
 	}
 }
 
-// Extracting the following command line arguments -f, -fd, -op, -of, -ov (and possible ordered repetitions)
-void get_video_input_output_params(vector<string> &input_video_files, vector<string> &depth_dirs, vector<string> &output_files,
-	vector<string> &output_video_files, bool& world_coordinates_pose, string& output_codec, vector<string> &arguments)
+// Extracting the following command line arguments -f, -op, -of, -ov (and possible ordered repetitions)
+void get_video_input_output_params(vector<string> &input_video_files, vector<string> &output_files,
+	vector<string> &output_video_files, string& output_codec, vector<string> &arguments)
 {
 	bool* valid = new bool[arguments.size()];
 
@@ -129,9 +105,6 @@ void get_video_input_output_params(vector<string> &input_video_files, vector<str
 	{
 		valid[i] = true;
 	}
-
-	// By default use rotation with respect to camera (not world coordinates)
-	world_coordinates_pose = false;
 
     // By default use DIVX codec
 	output_codec = "DIVX";
@@ -173,13 +146,6 @@ void get_video_input_output_params(vector<string> &input_video_files, vector<str
 			valid[i+1] = false;			
 			i++;
 		}		
-		else if (arguments[i].compare("-fd") == 0) 
-		{                    
-			depth_dirs.push_back(input_root + arguments[i + 1]);
-			valid[i] = false;
-			valid[i+1] = false;		
-			i++;
-		}
 		else if (arguments[i].compare("-of") == 0)
 		{
 			output_files.push_back(output_root + arguments[i + 1]);
@@ -196,10 +162,6 @@ void get_video_input_output_params(vector<string> &input_video_files, vector<str
 			valid[i+1] = false;
 			i++;
 		}		
-		else if (arguments[i].compare("-world_coord") == 0)
-		{
-			world_coordinates_pose = true;
-		}
 		else if (arguments[i].compare("-oc") == 0)
 		{
 			if(arguments[i + 1].length() == 4)
@@ -275,7 +237,7 @@ void get_camera_params(int &device, float &fx, float &fy, float &cx, float &cy, 
 	}
 }
 
-void get_image_input_output_params(vector<string> &input_image_files, vector<string> &input_depth_files, vector<string> &output_feature_files, vector<string> &output_pose_files, vector<string> &output_image_files,
+void get_image_input_output_params(vector<string> &input_image_files, vector<string> &output_feature_files, vector<string> &output_pose_files, vector<string> &output_image_files,
 		vector<cv::Rect_<double>> &input_bounding_boxes, vector<string> &arguments)
 {
 	bool* valid = new bool[arguments.size()];
@@ -318,13 +280,6 @@ void get_image_input_output_params(vector<string> &input_image_files, vector<str
 			valid[i+1] = false;			
 			i++;
 		}		
-		else if (arguments[i].compare("-fd") == 0) 
-		{                    
-			input_depth_files.push_back(input_root + arguments[i + 1]);
-			valid[i] = false;
-			valid[i+1] = false;		
-			i++;
-		}
 		else if (arguments[i].compare("-fdir") == 0) 
 		{                    
 
@@ -1008,16 +963,16 @@ void DrawBox(vector<pair<cv::Point, cv::Point>> lines, cv::Mat image, cv::Scalar
 }
 
 // Computing landmarks (to be drawn later possibly)
-vector<cv::Point2d> CalculateLandmarks(const cv::Mat_<double>& shape2D, cv::Mat_<int>& visibilities)
+vector<cv::Point2d> CalculateVisibleLandmarks(const cv::Mat_<double>& shape2D, const cv::Mat_<int>& visibilities)
 {
-	int n = shape2D.rows/2;
+	int n = shape2D.rows / 2;
 	vector<cv::Point2d> landmarks;
 
-	for( int i = 0; i < n; ++i)
-	{		
-		if(visibilities.at<int>(i))
+	for (int i = 0; i < n; ++i)
+	{
+		if (visibilities.at<int>(i))
 		{
-			cv::Point2d featurePoint(shape2D.at<double>(i), shape2D.at<double>(i +n));
+			cv::Point2d featurePoint(shape2D.at<double>(i), shape2D.at<double>(i + n));
 
 			landmarks.push_back(featurePoint);
 		}
@@ -1027,27 +982,27 @@ vector<cv::Point2d> CalculateLandmarks(const cv::Mat_<double>& shape2D, cv::Mat_
 }
 
 // Computing landmarks (to be drawn later possibly)
-vector<cv::Point2d> CalculateLandmarks(cv::Mat img, const cv::Mat_<double>& shape2D)
+vector<cv::Point2d> CalculateAllLandmarks(const cv::Mat_<double>& shape2D)
 {
-	
+
 	int n;
 	vector<cv::Point2d> landmarks;
-	
-	if(shape2D.cols == 2)
+
+	if (shape2D.cols == 2)
 	{
 		n = shape2D.rows;
 	}
-	else if(shape2D.cols == 1)
+	else if (shape2D.cols == 1)
 	{
-		n = shape2D.rows/2;
+		n = shape2D.rows / 2;
 	}
 
-	for( int i = 0; i < n; ++i)
-	{		
+	for (int i = 0; i < n; ++i)
+	{
 		cv::Point2d featurePoint;
-		if(shape2D.cols == 1)
+		if (shape2D.cols == 1)
 		{
-			featurePoint = cv::Point2d(shape2D.at<double>(i), shape2D.at<double>(i +n));
+			featurePoint = cv::Point2d(shape2D.at<double>(i), shape2D.at<double>(i + n));
 		}
 		else
 		{
@@ -1056,20 +1011,78 @@ vector<cv::Point2d> CalculateLandmarks(cv::Mat img, const cv::Mat_<double>& shap
 
 		landmarks.push_back(featurePoint);
 	}
-	
+
 	return landmarks;
 }
 
 // Computing landmarks (to be drawn later possibly)
-vector<cv::Point2d> CalculateLandmarks(CLNF& clnf_model)
+vector<cv::Point2d> CalculateAllLandmarks(const CLNF& clnf_model)
+{
+	return CalculateAllLandmarks(clnf_model.detected_landmarks);
+}
+
+// Computing landmarks (to be drawn later possibly)
+vector<cv::Point2d> CalculateVisibleLandmarks(const CLNF& clnf_model)
+{
+	// If the detection was not successful no landmarks are visible
+	if (clnf_model.detection_success)
+	{
+		int idx = clnf_model.patch_experts.GetViewIdx(clnf_model.params_global, 0);
+		// Because we only draw visible points, need to find which points patch experts consider visible at a certain orientation
+		return CalculateVisibleLandmarks(clnf_model.detected_landmarks, clnf_model.patch_experts.visibilities[0][idx]);
+	}
+	else
+	{
+		return vector<cv::Point2d>();
+	}
+}
+
+// Computing eye landmarks (to be drawn later or in different interfaces)
+vector<cv::Point2d> CalculateVisibleEyeLandmarks(const CLNF& clnf_model)
 {
 
-	int idx = clnf_model.patch_experts.GetViewIdx(clnf_model.params_global, 0);
+	vector<cv::Point2d> to_return;
+	// If the model has hierarchical updates draw those too
+	for (size_t i = 0; i < clnf_model.hierarchical_models.size(); ++i)
+	{
 
-	// Because we only draw visible points, need to find which points patch experts consider visible at a certain orientation
-	return CalculateLandmarks(clnf_model.detected_landmarks, clnf_model.patch_experts.visibilities[0][idx]);
+		if (clnf_model.hierarchical_model_names[i].compare("left_eye_28") == 0 ||
+			clnf_model.hierarchical_model_names[i].compare("right_eye_28") == 0)
+		{
 
+			auto lmks = CalculateVisibleLandmarks(clnf_model.hierarchical_models[i]);
+			for (auto lmk : lmks)
+			{
+				to_return.push_back(lmk);
+			}
+		}
+	}
+	return to_return;
 }
+
+// Computing eye landmarks (to be drawn later or in different interfaces)
+vector<cv::Point2d> CalculateAllEyeLandmarks(const CLNF& clnf_model)
+{
+
+	vector<cv::Point2d> to_return;
+	// If the model has hierarchical updates draw those too
+	for (size_t i = 0; i < clnf_model.hierarchical_models.size(); ++i)
+	{
+
+		if (clnf_model.hierarchical_model_names[i].compare("left_eye_28") == 0 ||
+			clnf_model.hierarchical_model_names[i].compare("right_eye_28") == 0)
+		{
+
+			auto lmks = CalculateAllLandmarks(clnf_model.hierarchical_models[i]);
+			for (auto lmk : lmks)
+			{
+				to_return.push_back(lmk);
+			}
+		}
+	}
+	return to_return;
+}
+
 
 // Drawing landmarks on a face image
 void Draw(cv::Mat img, const cv::Mat_<double>& shape2D, const cv::Mat_<int>& visibilities)
@@ -1481,8 +1494,8 @@ bool DetectSingleFaceHOG(cv::Rect_<double>& o_region, const cv::Mat_<uchar>& int
 
 			if(use_preferred)
 			{
-				dist = sqrt((preference.x - (face_detections[0].width/2 + face_detections[0].x)) * (preference.x - (face_detections[0].width/2 + face_detections[0].x)) + 
-							   (preference.y - (face_detections[0].height/2 + face_detections[0].y)) * (preference.y - (face_detections[0].height/2 + face_detections[0].y)));
+				dist = sqrt((preference.x - (face_detections[i].width/2 + face_detections[i].x)) * (preference.x - (face_detections[i].width/2 + face_detections[i].x)) + 
+							   (preference.y - (face_detections[i].height/2 + face_detections[i].y)) * (preference.y - (face_detections[i].height/2 + face_detections[i].y)));
 				better = dist < best_so_far;
 			}
 			else
